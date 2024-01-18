@@ -52,10 +52,20 @@ team_t team = {
 #define GET(p) (*(unsigned int *)(p))
 #define PUT(p, val) ((*(unsigned int *)(p)) = (val))
 
+#define GET_SIZE(p)   (GET(p) & ~0x07)    //得到地址p处的 size
+
 #define HDRP(bp)     ((char*)(bp) - WSIZE)                       //获得头部的地址
 #define FTRP(bp)     ((char*)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)  //获得脚部的地址, 与宏定义HDRP有耦合
 
+#define NEXT_BLKP(bp)    ((char*)(bp) + GET_SIZE((char*)(bp) - WSIZE))  //计算后块的地址
+
 static char *heap_list;
+
+static void *extend_heap(size_t size);     //拓展堆块
+static void *find_fit(size_t size);        //寻找空闲块
+static void place(char *bp, size_t size);  //分割空闲块
+static void *coalesce(void *bp);           //合并空闲块
+
 /*
  * mm_init - initialize the malloc package.
  */

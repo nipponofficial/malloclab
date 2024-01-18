@@ -219,7 +219,6 @@ static void *coalesce(void *bp) {
 
     /* Case 0: no need to coalesce */
     if (prev_alloc && next_alloc) {
-        DBG_PRINTF("no merge\n");
         insert(bp); 
         return bp; 
     }
@@ -227,7 +226,6 @@ static void *coalesce(void *bp) {
      * Case 1, previous block is free
      */
     else if (!prev_alloc && next_alloc) {
-        DBG_PRINTF("merge prev(%p)\n", prev_bp);
         /* setup merged block */
         current_size += GET_SIZE(HDRP(prev_bp));
         PUT(HDRP(prev_bp), PACK(current_size, 0));
@@ -238,7 +236,6 @@ static void *coalesce(void *bp) {
      * Case 2, next block is free, we need to delete next block from free list.
      */
     else if (prev_alloc && !next_alloc) {
-        DBG_PRINTF("merge next(%p)\n", next_bp);
         /* Delete next block from free list */
         delete(next_bp);
         /* setup merged block */
@@ -252,7 +249,6 @@ static void *coalesce(void *bp) {
      * Case 3, previous and next block both are free, we need to delete next block from free list.
      */
     else {
-        DBG_PRINTF("merge prev(%p) and next(%p)\n", prev_bp, next_bp);
         /* Delete next block from free list */
         delete(next_bp);
         /* setup merged block */
@@ -270,13 +266,10 @@ static void *coalesce(void *bp) {
  */
 static void insert(void* bp)
 {
-    DBG_PRINTF("Entering insert(%p)\n", bp);
     if (free_list == NULL) {
-        DBG_PRINTF("Free list is NULL, make %p the head of free list\n", bp);
         free_list = bp;
         SET_FDP(bp, NULL);
         SET_BKP(bp, NULL);
-        CHECKHEAP(0);
         return;
     }
     /* Set up current block */
@@ -286,7 +279,6 @@ static void insert(void* bp)
     SET_BKP(free_list, bp);
     /* Free list head is np now */
     free_list = bp;
-    CHECKHEAP(0);
 }
 /*
  * delete - Remove given block pointer from free list.
@@ -295,7 +287,6 @@ static void insert(void* bp)
  */
 static void delete(void* bp)
 {
-    DBG_PRINTF("Entering delete(%p)\n", bp);
     /* Only one free block */
     if(BKP(bp) == NULL && FDP(bp) == NULL) {
         free_list = NULL;
@@ -315,19 +306,4 @@ static void delete(void* bp)
         SET_FDP(BKP(bp), FDP(bp));
         SET_BKP(FDP(bp), BKP(bp));
     }
-    CHECKHEAP(0);
-}
-
-static void mm_checkheap(int verbose)
-{
-    DBG_PRINTF("---------------CHECK HEAP START---------------------\n");
-    DBG_PRINTF("freelist_headp: %p\n", free_list);
-    if (free_list) {
-        DBG_PRINTF("Free List: %p<-", BKP(free_list));
-        for (char * tmp = free_list; tmp != NULL; tmp = FDP(tmp)) {
-            DBG_PRINTF("%p(size: %u)->", tmp, GET_SIZE(HDRP(tmp)));
-        }
-        DBG_PRINTF("%p\n", NULL);
-    }
-    DBG_PRINTF("---------------CHECK HEAP END----------------------\n");
 }

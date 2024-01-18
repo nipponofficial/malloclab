@@ -46,9 +46,10 @@ team_t team = {
 #define WSIZE 4
 #define DSIZE 8
 #define CHUNKSIZE (1 << 12)
-#define PACK(size, alloc) ((size) | (alloc))
 
 #define MAX(x, y)  ((x) > (y) ? (x) : (y))
+
+#define PACK(size, alloc) ((size) | (alloc))
 
 #define GET(p) (*(unsigned int *)(p))
 #define PUT(p, val) ((*(unsigned int *)(p)) = (val))
@@ -59,23 +60,15 @@ team_t team = {
 #define HDRP(bp)     ((char*)(bp) - WSIZE)
 #define FTRP(bp)     ((char*)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
-#define FDP(bp)  (*(char **)(bp + WSIZE))
-#define BKP(bp)  (*(char **)(bp))
-
 #define NEXT_BLKP(bp)    ((char*)(bp) + GET_SIZE(HDRP(bp)))  //计算后块的地址
 #define PREV_BLKP(bp)    ((char*)(bp) - GET_SIZE((char*)(bp) - DSIZE))  //计算前块的地址
 
-#define SET_BKP(bp, bkp) (BKP(bp) = bkp)
-#define SET_FDP(bp, fdp) (FDP(bp) = fdp)
-
-static char *heap_list, *free_list;
+static char *heap_list, *prev_list;
 
 static void *extend_heap(size_t size);     //拓展堆块
 static void *find_fit(size_t size);        //寻找空闲块
 static void *coalesce(void *bp);           //合并空闲块
 static void place(char *bp, size_t size);  //分割空闲块
-static void insert(void *bp); /* insert a free block to free list */
-static void delete(void *bp); /* delete a free block from free list */
 
 /*
  * mm_init - initialize the malloc package.
@@ -89,7 +82,7 @@ int mm_init(void) {
 		PUT(heap_list + (3*WSIZE), PACK(DSIZE, 1));
 		heap_list += (2*WSIZE);
 
-		free_list = NULL;
+		prev_list = heap_list;
 
 		if (extend_heap(CHUNKSIZE/WSIZE) == NULL)   //拓展堆块
 				return -1;
@@ -106,13 +99,12 @@ void *mm_malloc(size_t size) {
 		size_t extendsize;
 		void *bp = NULL;
 
-		if (size == 0)
-				return NULL;
+		if (size == 0) return NULL;
 
 		if (size < DSIZE) 
 				asize = 2 * DSIZE;
 		else 
-				asize = ALIGN(size + 8);
+				asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 			
 		if ((bp = find_fit(asize)) != NULL){
 				place((char *)bp, asize);
@@ -135,8 +127,9 @@ void mm_free(void *ptr) {
 		if (ptr == 0)
 				return;
 
-		PUT(HDRP(ptr), PACK(GET_SIZE(HDRP(ptr)), 0));
-		PUT(FTRP(ptr), PACK(GET_SIZE(HDRP(ptr)), 0));
+		size_t size = GET_SIZE(HDRP(ptr));
+		PUT(HDRP(ptr), PACK(GET_SIZE(HDRP(size)), 0));
+		PUT(FTRP(ptr), PACK(GET_SIZE(HDRP(size)), 0));
 		coalesce(ptr);
 }
 
@@ -145,14 +138,18 @@ void mm_free(void *ptr) {
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
 void *mm_realloc(void *ptr, size_t size) {
-		void *oldptr = ptr;
-		void *newptr;
-		size_t copySize;
+		if (ptr == NULL)
+				return mm_malloc(size);
+		
+		if (size == 0) {
+        mm_free(ptr);
+        return NULL;
+    }
 
-		newptr = mm_malloc(size);
-		if (newptr == NULL)
-				return NULL;
-		size = GET_SIZE(HDRP(oldptr));
+		void *oldptr = ptr;
+    void *newptr = mm_malloc(size);
+    size_t copySize;
+
 		copySize = GET_SIZE(HDRP(newptr));
 		if (size < copySize)
 				copySize = size;
@@ -181,12 +178,20 @@ static void *extend_heap(size_t size) {
 
 static void *find_fit(size_t size) {         
 
-		for (char* bp = free_list; bp != NULL; bp = FDP(bp)) {
-				if (GET_SIZE(HDRP(bp)) >= size) {
-					return bp;
-				}
-		}
-		return NULL;
+		void *bp;
+    for (bp = prev_list; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (size <= GET_SIZE(HDRP(bp)))) {
+            prev_list = bp;
+            return bp;
+        }
+    }
+    for (bp = heap_list; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (size <= GET_SIZE(HDRP(bp)))) {
+            prev_list = bp;
+            return bp;
+        }
+    }
+    return NULL;
 } 
 
 static void place(char *bp, size_t asize) {
@@ -196,112 +201,39 @@ static void place(char *bp, size_t asize) {
 		if (remainder_size >= 2*DSIZE) {
 				PUT(HDRP(bp), PACK(asize, 1));
 				PUT(FTRP(bp), PACK(asize, 1));
+				bp = NEXT_BLKP(bp);
 				PUT(HDRP(bp), PACK(remainder_size, 0));
 				PUT(FTRP(bp), PACK(remainder_size, 0));
-				coalesce(NEXT_BLKP(bp));
 		} else {
 				PUT(HDRP(bp), PACK(total_size, 1));
 				PUT(FTRP(bp), PACK(total_size, 1));
 		}
+		prev_list = bp;
 }
 
 static void *coalesce(void *bp) {
 		   
-		void* prev_bp = PREV_BLKP(bp);
-    void* next_bp = NEXT_BLKP(bp);
+		size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+    size_t size = GET_SIZE(HDRP(bp));
 
-    size_t prev_alloc = GET_ALLOC(FTRP(prev_bp));
-    size_t next_alloc = GET_ALLOC(HDRP(next_bp));
-
-    size_t current_size = GET_SIZE(HDRP(bp));
-
-    /* Case 0: no need to coalesce */
-    if (prev_alloc && next_alloc) {
-        insert(bp); 
-        return bp; 
+    if (prev_alloc && next_alloc) {                     /* Case 1 */
+        /* Do nothing */
+    } else if (prev_alloc && !next_alloc) {             /* Case 2 */
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
+    } else if (!prev_alloc && next_alloc) {             /* Case 3 */
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+    } else {                                            /* Case 4 */
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp))) + GET_SIZE(HDRP(PREV_BLKP(bp)));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
     }
-    /* 
-     * Case 1, previous block is free
-     */
-    else if (!prev_alloc && next_alloc) {
-        /* setup merged block */
-        current_size += GET_SIZE(HDRP(prev_bp));
-        PUT(HDRP(prev_bp), PACK(current_size, 0));
-        PUT(FTRP(bp), PACK(current_size, 0));
-        return prev_bp;
-    }
-    /* 
-     * Case 2, next block is free, we need to delete next block from free list.
-     */
-    else if (prev_alloc && !next_alloc) {
-        /* Delete next block from free list */
-        delete(next_bp);
-        /* setup merged block */
-        current_size += GET_SIZE(HDRP(next_bp));
-        PUT(HDRP(bp), PACK(current_size, 0));
-        PUT(FTRP(bp), PACK(current_size, 0));
-        insert(bp);
-        return bp;
-    }
-    /* 
-     * Case 3, previous and next block both are free, we need to delete next block from free list.
-     */
-    else {
-        /* Delete next block from free list */
-        delete(next_bp);
-        /* setup merged block */
-        current_size += GET_SIZE(HDRP(prev_bp));
-        current_size += GET_SIZE(FTRP(next_bp));
-        PUT(HDRP(prev_bp), PACK(current_size, 0));
-        PUT(FTRP(next_bp), PACK(current_size, 0));
-        return prev_bp;
-    }   
-}
-
-/*
- * insert - Insert given block pointer to the head of free list.
- * insert() is called by free() or place()
- */
-static void insert(void* bp)
-{
-    if (free_list == NULL) {
-        free_list = bp;
-        SET_FDP(bp, NULL);
-        SET_BKP(bp, NULL);
-        return;
-    }
-    /* Set up current block */
-    SET_FDP(bp, free_list);
-    SET_BKP(bp, 0);
-    /* Set next block */
-    SET_BKP(free_list, bp);
-    /* Free list head is np now */
-    free_list = bp;
-}
-/*
- * delete - Remove given block pointer from free list.
- * delete() is called by place() or coalesce();
- * we dont' call delete() when there's no free block, so what we deleted is what we inserted.
- */
-static void delete(void* bp)
-{
-    /* Only one free block */
-    if(BKP(bp) == NULL && FDP(bp) == NULL) {
-        free_list = NULL;
-    }
-    /* More than one free block, delete the first block */
-    else if (BKP(bp) == NULL) {
-        /* Fix free list head */
-        SET_BKP(FDP(bp), NULL);
-        free_list = FDP(bp);
-    }
-    /* More than one free block, delete the last block */
-    else if (FDP(bp) == NULL) {
-        SET_FDP(BKP(bp), NULL);
-    }
-    /* More than two free block, delete the middle block */
-    else {
-        SET_FDP(BKP(bp), FDP(bp));
-        SET_BKP(FDP(bp), BKP(bp));
-    }
+    prev_list = bp;
+    return bp;
 }

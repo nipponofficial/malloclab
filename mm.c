@@ -74,6 +74,9 @@ static void *extend_heap(size_t size);     //拓展堆块
 static void *find_fit(size_t size);        //寻找空闲块
 static void *coalesce(void *bp);           //合并空闲块
 static void place(char *bp, size_t size);  //分割空闲块
+static void insert(void *bp); /* insert a free block to free list */
+static void delete(void *bp); /* delete a free block from free list */
+static void mm_checkheap(int verbose);
 
 /*
  * mm_init - initialize the malloc package.

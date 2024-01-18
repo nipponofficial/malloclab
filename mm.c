@@ -117,8 +117,6 @@ void *mm_malloc(size_t size) {
   else 
     asize = ALIGN(size + 8);
     
-  asize = ALIGN(size + 2*WSIZE);
-
   if ((bp = find_fit(asize)) != NULL){
     place((char *)bp, asize);
     return bp;

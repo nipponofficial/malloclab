@@ -80,6 +80,8 @@ int mm_init(void) {
   PUT(heap_list, PACK(0, 1));
   heap_list += (2*WSIZE);
 
+  if (extend_heap(CHUNKSIZE) == NULL)   //拓展堆块
+    return -1;
   return 0;
 }
 
@@ -107,10 +109,12 @@ void *mm_malloc(size_t size) {
   size_t extendsize;
   void *bp = NULL;
 
-  if(size == 0)
+  if (size == 0)
     return NULL;
+  
+  asize = ALIGN(size + 2*WSIZE);
 
-  if((bp = find_fit(asize)) != NULL){
+  if ((bp = find_fit(asize)) != NULL){
     place((char *)bp, asize);
     return bp;
   }
@@ -161,7 +165,7 @@ void mm_free(void *ptr) {
   coalesce(ptr);
 }
 
-void *coalesce(void *bp) {          
+static void *coalesce(void *bp) {          
     int pre_alloc = GET_ALLOC(HDRP(PREV_BLKP(bp)));
     int post_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));

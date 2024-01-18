@@ -124,7 +124,7 @@ void *mm_malloc(size_t size) {
  * mm_free - Freeing a block does nothing.
  */
 void mm_free(void *ptr) {
-		if (ptr == 0)
+		if (ptr == NULL)
 				return;
 
 		size_t size = GET_SIZE(HDRP(ptr));
@@ -139,24 +139,26 @@ void mm_free(void *ptr) {
  */
 void *mm_realloc(void *ptr, size_t size) {
 		if (ptr == NULL)
-				return mm_malloc(size);
-		
-		if (size == 0) {
+        return mm_malloc(size);
+
+    if (size == 0) {
         mm_free(ptr);
         return NULL;
     }
 
-		void *oldptr = ptr;
-    void *newptr = mm_malloc(size);
+    void *oldptr = ptr;
+    void *newptr;
     size_t copySize;
-
-		copySize = GET_SIZE(HDRP(newptr));
-		if (size < copySize)
-				copySize = size;
-		memcpy(newptr, oldptr, copySize - WSIZE);
-		mm_free(oldptr);
-
-		return newptr;
+    
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+        return NULL;
+    copySize = GET_SIZE(HDRP(newptr));
+    if (size < copySize)
+        copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
 }
 
 

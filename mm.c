@@ -101,11 +101,11 @@ void *mm_malloc(size_t size) {
 
 		if (size == 0) return NULL;
 
-		// if (size <= DSIZE) 
-		// 		asize = 2 * DSIZE;
-		// else 
-		// 		asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
-		asize = ALIGN(size + 2*WSIZE);
+		if (size <= DSIZE) 
+				asize = 2 * DSIZE;
+		else 
+				// asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+				asize = ALIGN(size + 4);
 
 		if ((bp = find_fit(asize)) != NULL){
 				place((char *)bp, asize);
@@ -113,7 +113,7 @@ void *mm_malloc(size_t size) {
 		}
 
 		extendsize = MAX(asize, CHUNKSIZE);
-		if ((bp = extend_heap(extendsize)) == NULL)
+		if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
 				return NULL;
 		place(bp, asize);
 		

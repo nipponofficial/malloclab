@@ -305,7 +305,8 @@ void *mm_malloc(size_t size)
     if (size <= DSIZE) 
         asize = 2 * DSIZE;
     else
-        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+        // asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+				asize = ALIGN(size + 16);
 
     if ((bp = next_fit(asize)) != NULL) {
         place(bp, asize);

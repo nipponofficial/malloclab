@@ -47,6 +47,8 @@ team_t team = {
 #define CHUNKSIZE (1 << 12)
 #define PACK(size, alloc) ((size) | (alloc))
 
+#define MAX(x, y)  ((x) > (y) ? (x) : (y))
+
 #define GET(p) (*(unsigned int *)(p))
 #define PUT(p, val) ((*(unsigned int *)(p)) = (val))
 
@@ -69,6 +71,21 @@ int mm_init(void) {
   return 0;
 }
 
+static void *extend_heap(size_t size) {
+    size_t asize;   
+    void *bp;
+
+    asize = ALIGN(size);
+     //printf("extend %d\n", asize);
+    if ((long)(bp = mem_sbrk(asize)) == -1)
+        return NULL;
+
+    PUT(HDRP(bp), PACK(asize, 0));          //HDRP(bp)指向原结尾块
+    PUT(FTRP(bp), PACK(asize, 0));          
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   //新结尾块
+    return coalesce(bp);
+}
+
 /*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
@@ -76,13 +93,13 @@ int mm_init(void) {
 void *mm_malloc(size_t size) {
   size_t asize;
   size_t extendsize;
-  char *bp = NULL;
+  void *bp = NULL;
 
   if(size == 0)
     return NULL;
 
   if((bp = find_fit(asize)) != NULL){
-    place(bp, asize);
+    place((char *)bp, asize);
     return bp;
   }
 
@@ -132,7 +149,7 @@ void mm_free(void *ptr) {
   coalesce(ptr);
 }
 
-static void *coalesce(void *bp) {          
+void *coalesce(void *bp) {          
     int pre_alloc = GET_ALLOC(HDRP(PREV_BLKP(bp)));
     int post_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));

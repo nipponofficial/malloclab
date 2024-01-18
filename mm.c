@@ -76,7 +76,6 @@ static void *coalesce(void *bp);           //合并空闲块
 static void place(char *bp, size_t size);  //分割空闲块
 static void insert(void *bp); /* insert a free block to free list */
 static void delete(void *bp); /* delete a free block from free list */
-static void mm_checkheap(int verbose);
 
 /*
  * mm_init - initialize the malloc package.
@@ -135,7 +134,6 @@ void *mm_malloc(size_t size) {
 void mm_free(void *ptr) {
 		if (ptr == 0)
 				return;
-		size_t size = GET_SIZE(HDRP(ptr));
 
 		PUT(HDRP(ptr), PACK(GET_SIZE(HDRP(ptr)), 0));
 		PUT(FTRP(ptr), PACK(GET_SIZE(HDRP(ptr)), 0));
@@ -169,13 +167,13 @@ static void *extend_heap(size_t size) {
 		size_t asize;   
 		void *bp;
 
-		size = (size % 2) ? (size + 1) * WSIZE : size * WSIZE;
+		asize = (size % 2) ? (size + 1) * WSIZE : size * WSIZE;
 
 		if ((long)(bp = mem_sbrk(asize)) == -1)
 				return NULL;
 
-		PUT(HDRP(bp), PACK(size, 0));          //HDRP(bp)指向原结尾块
-		PUT(FTRP(bp), PACK(size, 0));          
+		PUT(HDRP(bp), PACK(asize, 0));          //HDRP(bp)指向原结尾块
+		PUT(FTRP(bp), PACK(asize, 0));          
 		PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   //新结尾块
 		return coalesce(bp);
 }

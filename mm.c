@@ -110,8 +110,8 @@ void *mm_malloc(size_t size)
     if (size <= DSIZE) 
         asize = 2 * DSIZE;
     else
-				asize = ALIGN(size + DSIZE);
-				// asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+				// asize = ALIGN(size + DSIZE);
+				asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
     if ((bp = first_fit(asize)) != NULL) {
         place(bp, asize);
@@ -174,8 +174,8 @@ static void *extend_heap(size_t size)
     void *bp;
     size_t asize;
 
-    asize = ALIGN(size);
-    // asize = (size % 2) ? (size+1) * WSIZE : size * WSIZE;
+    // asize = ALIGN(size);
+    asize = (size % 2) ? (size+1) * WSIZE : size * WSIZE;
 
     if ((bp = mem_sbrk(asize)) == (void *)-1)
         return NULL;

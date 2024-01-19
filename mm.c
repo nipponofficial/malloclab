@@ -113,8 +113,7 @@ void *mm_malloc(size_t size)
     if (size <= DSIZE) 
         asize = 2 * DSIZE;
     else
-        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
-				// asize = ALIGN(size + 16);
+				asize = ALIGN(size + DSIZE);
 
     if ((bp = next_fit(asize)) != NULL) {
         place(bp, asize);
@@ -172,18 +171,18 @@ void *mm_realloc(void *ptr, size_t size)
     return newptr;
 }
 
-static void *extend_heap(size_t words)
+static void *extend_heap(size_t size)
 {
     void *bp;
-    size_t size;
+    size_t asize;
 
-    size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
+    asize = ALIGN(size);
 
-    if ((bp = mem_sbrk(size)) == -1)
+    if ((bp = mem_sbrk(asize)) == -1)
         return NULL;
 
-    PUT(HDRP(bp), PACK(size, 0));
-    PUT(FTRP(bp), PACK(size, 0));
+    PUT(HDRP(bp), PACK(asize, 0));
+    PUT(FTRP(bp), PACK(asize, 0));
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
     return coalesce(bp);
 }

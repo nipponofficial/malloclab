@@ -46,7 +46,7 @@ team_t team = {
 /* Basic constants and macros */
 #define WSIZE       8       /* Word and header/footer size (bytes) */
 #define DSIZE       16      /* Double word size (bytes) */
-#define CHUNKSIZE  (1<<12)  /* Extend heap by this amount (bytes) */
+#define CHUNKSIZE  (1<<24)  /* Extend heap by this amount (bytes) */
 
 #define MAX(x, y)           ((x) > (y) ? (x) : (y))
 
@@ -71,12 +71,10 @@ team_t team = {
 
 
 static char *heap_listp;
-static char *pre_listp;
 
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 static void *first_fit(size_t asize);
-static void *next_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
 /* 
@@ -91,7 +89,6 @@ int mm_init(void)
     PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1));
     PUT(heap_listp + (3 * WSIZE), PACK(0, 1));
     heap_listp += (2 * WSIZE);
-    pre_listp = heap_listp;
 
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
         return -1;
@@ -115,7 +112,7 @@ void *mm_malloc(size_t size)
     else
 				asize = ALIGN(size + DSIZE);
 
-    if ((bp = next_fit(asize)) != NULL) {
+    if ((bp = first_fit(asize)) != NULL) {
         place(bp, asize);
         return bp;
     }
@@ -210,22 +207,14 @@ static void *coalesce(void *bp)
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    pre_listp = bp;
     return bp;
 }
 
-static void *next_fit(size_t asize)
+static void *first_fit(size_t asize)
 {
     void *bp;
-    for (bp = pre_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
-            pre_listp = bp;
-            return bp;
-        }
-    }
     for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
-            pre_listp = bp;
             return bp;
         }
     }
@@ -246,5 +235,4 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(size,1));
         PUT(FTRP(bp), PACK(size,1));
     }
-    pre_listp = bp;
 }

@@ -44,9 +44,9 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /* Basic constants and macros */
-#define WSIZE       8       /* Word and header/footer size (bytes) */
-#define DSIZE       16      /* Double word size (bytes) */
-#define CHUNKSIZE  (1<<24)  /* Extend heap by this amount (bytes) */
+#define WSIZE       4       /* Word and header/footer size (bytes) */
+#define DSIZE       8      /* Double word size (bytes) */
+#define CHUNKSIZE  (1<<12)  /* Extend heap by this amount (bytes) */
 
 #define MAX(x, y)           ((x) > (y) ? (x) : (y))
 
@@ -58,7 +58,7 @@ team_t team = {
 #define PUT(p, val)         (*(unsigned long long *)(p) = (val))
 
 /* Read the size and allocated fields from address p */
-#define GET_SIZE(p)         (GET(p) & ~0xF)
+#define GET_SIZE(p)         (GET(p) & ~0x7)
 #define GET_ALLOC(p)        (GET(p) & 0x1)
 
 /* Given block ptr bp, compute address of its header and footer */
@@ -110,7 +110,8 @@ void *mm_malloc(size_t size)
     if (size <= DSIZE) 
         asize = 2 * DSIZE;
     else
-				asize = ALIGN(size + DSIZE);
+				// asize = ALIGN(size + DSIZE);
+				asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
     if ((bp = first_fit(asize)) != NULL) {
         place(bp, asize);
@@ -173,7 +174,8 @@ static void *extend_heap(size_t size)
     void *bp;
     size_t asize;
 
-    asize = ALIGN(size);
+    // asize = ALIGN(size);
+    asize = (size % 2) ? (size+1) * WSIZE : size * WSIZE;
 
     if ((bp = mem_sbrk(asize)) == -1)
         return NULL;
